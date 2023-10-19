@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# echo "*/1 * * * * /sbin/ylx_ModemState_Detect.sh" | crontab -
+
+
+model=$(cat /tmp/sysinfo/modemel)
+
+
+
+#add modemem node to configuration file
+case $model in 
+    *x4*|*x5*)
+        for i in 1 2 3 4; do
+            mod="modem${i}"
+            uci set network.${mod}=interface
+            uci set network.${mod}.proto=dhcp
+            uci set network.${mod}.ifname=wwan${i}
+            uci add_list firewall.@zone[1].network=${mod}
+            uci set modemdial.${mod}=dial
+            uci set modemdial.${mod}.path=$(uci get modemdial.global.path)
+            uci set modemdial.${mod}.custom=$(uci get modemdial.global.custom)
+            uci set modemdial.${mod}.apn=$(uci get modemdial.global.apn)
+            uci set modemdial.${mod}.user=$(uci get modemdial.global.user)
+            uci set modemdial.${mod}.passwd=$(uci get modemdial.global.passwd)
+            uci set modemdial.${mod}.auth=$(uci get modemdial.global.auth)
+            uci set modemdial.${mod}.ipv4=$(uci get modemdial.global.ipv4)
+            uci set modemdial.${mod}.ipv6=$(uci get modemdial.global.ipv6)
+            uci set modemdial.${mod}.pincode=$(uci get modemdial.global.pincode)
+        done
+        uci commit network
+        uci commit firewall
+        uci commit modemdial
+
+    ;;
+    *)
+        uci set network.modem=interface
+        uci set network.modem.proto=dhcp
+        uci set network.modem.ifname=wwan0
+        uci add_list firewall.@zone[1].network=modem
+        uci commit network
+        uci commit firewall
+
+        uci set system.modem=led
+        uci set system.modem.name='Modem Act'
+        uci set system.modem.sysfs='led_mod'
+        uci set system.modem.trigger=netdev
+        uci set system.modem.mode='tx rx'
+        uci set system.modem.dev='wwan0'
+        uci commit system
+
+        uci set modemdial.modem=dial
+        uci set modemdial.modem.path=$(uci get modemdial.global.path)
+        uci set modemdial.modem.custom=$(uci get modemdial.global.custom)
+        uci set modemdial.modem.apn=$(uci get modemdial.global.apn)
+        uci set modemdial.modem.user=$(uci get modemdial.global.user)
+        uci set modemdial.modem.passwd=$(uci get modemdial.global.passwd)
+        uci set modemdial.modem.auth=$(uci get modemdial.global.auth)
+        uci set modemdial.modem.ipv4=$(uci get modemdial.global.ipv4)
+        uci set modemdial.modem.ipv6=$(uci get modemdial.global.ipv6)
+        uci set modemdial.modem.pincode=$(uci get modemdial.global.pincode)
+        uci commit modemdial
+    ;;
+esac
+
+
+
+
+exit 0
