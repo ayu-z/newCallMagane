@@ -6,7 +6,7 @@
 #define DIALTOOL_MEIG       "meig-CM"
 #define DIALTOOL_FIBOCOM    "fibocom-dial"
 #define DIALPACKAGE_NAME    "modemdial"
-#define DIALSECTION_NAME    "dial"
+#define DIALSECTION_NAME    "modem"
 
 typedef struct{
 	char *path;
@@ -17,15 +17,9 @@ typedef struct{
 	int auth;
 	int ipv4;
 	int ipv6;
-	int pincode;
+	char *pincode;
 } dialConfig_t;
 
-enum modemch{
-	UNKNOWN_CH,
-	MODEM_CH1,
-	MODEM_CH2,
-	MODEM_CH3,
-	MODEM_CH4,
-};
+int loadModemDialConfig(char *path, dialConfig_t *dial);
 
 #endif // !__MODEM_DIAL_H
