@@ -7,29 +7,6 @@
 #include <uci.h>
 
 
-static int multiDeviceModemPathMatch(char *node)
-{
-    char x45HwNode[][2][6] = {
-    {"3-1.4","4-1.4"},
-    {"3-1.3","4-1.3"},
-    {"3-1.2","4-1.3"},
-    {"3-1.1","4-1.1"},
-    };
-
-    int ch = UNKNOWN_CH;
-
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 2; j++) {
-            if(strstr(node, x45HwNode[i][j])) {
-                ch = i + 1;
-                break;
-            }
-        }
-    }
-    printf("%d\n", ch);
-    return ch;
-}
-
 int updateModemDialConfig(char *path)
 {
     if (path == NULL) {

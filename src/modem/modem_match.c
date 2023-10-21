@@ -1,28 +1,25 @@
+#include "modem_match.h"
+#include "../common/common.h"
+#include "../common/hashtable.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <glib-2.0/glib.h>
 #include <string.h>
+
+#define MAX_HASH_LIMIT 0x41a7
+
+typedef void (*modemEventHandle)(void *);
 
 typedef struct {
     int idVendor;
     int idProduct;
 } UID_t;
 
-typedef void (*cb_func)(void *);
-
-void init(void *data) {
-    printf("cb_func init: %s\n", (char *)data);
-}
-
-void dial(void *data) {
-    printf("cb_func dial: %s\n", (char *)data);
-}
 
 typedef struct {
     char *name;
     int ATidx;
-    cb_func init;
-    cb_func dial;
+    modemEventHandle init;
+    modemEventHandle dial;
 } Modem_t;
 
 typedef struct {
@@ -30,68 +27,83 @@ typedef struct {
     Modem_t modem;
 } ModemInfo_t;
 
-guint uid_hash(gconstpointer key) {
-    const UID_t *hash_key = (const UID_t *)key;
-    return g_int_hash(&hash_key->idVendor) ^ g_int_hash(&hash_key->idProduct);
+unsigned int customKeyInsertHandle(void *key) {
+    UID_t *hashKey = (UID_t *)key;
+
+    return (unsigned int)((((unsigned long)hashKey->idVendor << 16) | hashKey->idProduct)%MAX_HASH_LIMIT);
 }
 
-int uid_equal(gconstpointer a, gconstpointer b) {
-    const UID_t *uid_a = (const UID_t *)a;
-    const UID_t *uid_b = (const UID_t *)b;
-    return uid_a->idVendor == uid_b->idVendor && uid_a->idProduct == uid_b->idProduct;
+unsigned int customKeyCompareHandle(void *key1, void *key2) {
+    UID_t *uid1 = (UID_t *)key1;
+    UID_t *uid2 = (UID_t *)key2;
+
+    return (uid1->idVendor == uid2->idVendor && uid1->idProduct == uid2->idProduct);
 }
 
-GHashTable *hash_table;
-
-void modem_destroy(gpointer value) {
-    Modem_t *modem = (Modem_t *)value;
-    free(modem->name);
-    free(modem);
+void modemInit(void *data) 
+{
+    printf("modemEventHandle init: %s\n", (char *)data);
 }
 
-void modem_match_add(ModemInfo_t *modem_info) {
-    Modem_t *value = malloc(sizeof(Modem_t));
-    value->name = g_strdup(modem_info->modem.name);
-    value->ATidx = modem_info->modem.ATidx;
-    value->init = modem_info->modem.init;
-    value->dial = modem_info->modem.dial;
-
-    g_hash_table_insert(hash_table, &modem_info->uid, value);
+void modemDial(void *data) 
+{
+    printf("modemEventHandle dial: %s\n", (char *)data);
 }
 
+static ModemInfo_t modemMatchTable[] = {
+    
+    {0x2c7c, 0x0800, VENDOR_QUECTEL(RM500Q), 3, modemInit, modemDial},
+    {0x2c7c, 0x0900, VENDOR_QUECTEL(RM500U), 3, modemInit, modemDial},
+    {0x2c7c, 0x0125, VENDOR_QUECTEL(EC20), 3, modemInit, modemDial},
+    {0x2c7c, 0x0620, VENDOR_QUECTEL(EM1x0RG), 3, modemInit, modemDial},
+    {0x2c7c, 0x030a, VENDOR_QUECTEL(EM05G), 3, modemInit, modemDial},
+    {0x2c7c, 0x030e, VENDOR_QUECTEL(EM05G), 3, modemInit, modemDial},
+    {0x12d1, 0x1506, VENDOR_QUECTEL(EM350), 3, modemInit, modemDial},
+    {0x2dee, 0x4d22, VENDOR_MEIG(SRM-Series), 3, modemInit, modemDial},
+    {0x2dee, 0x4d58, VENDOR_MEIG(SLM770), 2, modemInit, modemDial},
+    {0x2dee, 0x4d52, VENDOR_MEIG(SRM821), 1, modemInit, modemDial},
+    {0x05c6, 0xf601, VENDOR_MEIG(SLM750), 3, modemInit, modemDial},
+    {0x3c93, 0xffff, VENDOR_MEIG(SRM810), 3, modemInit, modemDial},
+    {0x2cb7, 0x0104, VENDOR_FIBOCOM(FM150), 3, modemInit, modemDial},
+    {0x1508, 0x1001, VENDOR_FIBOCOM(NL668), 3, modemInit, modemDial},
+    {0x12d1, 0x15c3, "HuaWei MH5000", 3, modemInit, modemDial},
+    {0x3466, 0x3301, "TD Tech MT5710", 1, modemInit, modemDial},
+    {0x1286, 0x4e3c, "YuGe CLM920", 3, modemInit, modemDial},
+    {0x1e2d, 0x00b3, "Thales T99W175", 3, modemInit, modemDial},
+    {0x1e0e, 0x9001, "SimCOM SIM8200", 3, modemInit, modemDial},
+    {0x1782, 0x4038, "Haixing MNR01", 3, modemInit, modemDial},
+    {0x05c6, 0x9091, "Yidong F03X", 3, modemInit, modemDial},
+    {0x05c6, 0x90db, "yiseacom", 3, modemInit, modemDial},
+    {0x05c6, 0x90d5, "FOXCON", 3, modemInit, modemDial},
+    {0x2949, 0x8802, "YouFANG N510M", 3, modemInit, modemDial},
+    {0x2cb7, 0x0a05, "YanFei Fibcom", 3, modemInit, modemDial},
+};
 
-void modem_init() {
-    hash_table = g_hash_table_new_full(uid_hash, uid_equal, NULL, modem_destroy);
+
+void printfModemMatchTable(hashTable_t* hashTable)
+{
+    Modem_t *res;
+
+    for (size_t i = 0; i < countKeysHashTable(hashTable); i++){
+        res = (Modem_t *)searchKeyHashTable(hashTable, &modemMatchTable[i].uid);
+        if (res != NULL) {
+            printf("idx: %02ld Modem Name: %s - AT COM:%d\n", i, res->name, res->ATidx);
+
+        } 
+    }
 }
 
+int main() 
+{
+    hashTable_t* hashTable = createHashTable(customKeyInsertHandle, customKeyCompareHandle);
 
-int main() {
-    modem_init();
-
-    ModemInfo_t modem_info = {
-        .uid.idVendor = 0x1234,
-        .uid.idProduct = 0x6789,
-        .modem.name = "SRM821",
-        .modem.ATidx = 2,
-        .modem.init = init,
-        .modem.dial = dial,
-    };
-
-    modem_match_add(&modem_info);
-
-    UID_t search_key = {0x1234, 0x6789};
-    Modem_t *found_value = g_hash_table_lookup(hash_table, &search_key);
-
-    if (found_value != NULL) {
-        printf("Name: %s\n", found_value->name);
-        printf("AT IDX: %d\n", found_value->ATidx);
-        found_value->init(NULL);
-        found_value->dial(NULL);
-    } else {
-        printf("Value not found for the given key.\n");
+    for (int i = 0; i < sizeof(modemMatchTable) / sizeof(modemMatchTable[0]); i++) {
+        insertKeyHashTable(hashTable, &modemMatchTable[i].uid, &modemMatchTable[i].modem);
     }
 
-    g_hash_table_destroy(hash_table);
+    printfModemMatchTable(hashTable);
 
-    return 0;
+    destroyHashTable(hashTable);
+
+    return EXIT_SUCCESS;
 }
